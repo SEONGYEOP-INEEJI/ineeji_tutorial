@@ -7,15 +7,15 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error
 from sklearn.preprocessing import StandardScaler
 
 # 사용자 정의 모듈 임포트
-from config import model_conf, test_bed, train_conf, train_conf_testbed
-from data_utils import (
+from config import model_conf, test_bed, train_conf, train_conf_testbed, data_conf
+from utils.data_utils import (
     load_data,
     preprocess_data,
     train_valid_test_split,
     RegressionDataset,
 )
-from early_stopping import EarlyStopping
-from model_utils import (
+from utils.early_stopping import EarlyStopping
+from utils.model_utils import (
     get_loss,
     get_opt,
     train_model,
@@ -24,15 +24,23 @@ from model_utils import (
     save_model,
     evaluate_and_print_metrics,
 )
-from models import NLINEAR
+from models.model import NLINEAR
 
 # prepare data
 if __name__ == "__main__":
     # 모델 설정 불러오기
     if test_bed:
-        _model_conf, _train_conf = model_conf["NLINEAR"], train_conf_testbed
+        _data_conf, _model_conf, _train_conf = (
+            data_conf,
+            model_conf["NLINEAR"],
+            train_conf_testbed,
+        )
     else:
-        _model_conf, _train_conf = model_conf["NLINEAR"], train_conf
+        _data_conf, _model_conf, _train_conf = (
+            data_conf,
+            model_conf["NLINEAR"],
+            train_conf,
+        )
     window_size, forecast_size, individual = (
         _model_conf["window_size"],
         _model_conf["forecast_size"],
@@ -40,7 +48,7 @@ if __name__ == "__main__":
     )
 
     # 데이터 불러오기 및 전처리
-    data = load_data("california_housing.csv")
+    data = load_data(_data_conf["path"])
     data = preprocess_data(data)
     train_dataset, valid_dataset, test_dataset = train_valid_test_split(data)
 
@@ -63,7 +71,7 @@ if __name__ == "__main__":
 
     # 학습률 스케줄러와 EarlyStopping 설정
     scheduler = ReduceLROnPlateau(optimizer, "min", patience=10)
-    early_stopping = EarlyStopping(patience=_train_conf["patience"], verbose=True)
+    early_stopping = EarlyStopping(patience=_train_conf["patience"], verbose=True, checkpoint_path=_train_conf["checkpoint_path"])
 
     train_losses = []
     valid_losses = []
@@ -88,7 +96,7 @@ if __name__ == "__main__":
             print(f"Epoch {epoch}, Validation Loss: {valid_loss}")
 
     # 모델 로드
-    model.load_state_dict(torch.load("checkpoint.pt"))
+    model.load_state_dict(torch.load(_train_conf["checkpoint_path"]))
 
     # 학습 곡선 그리기
     plot_learning_curve(train_losses, valid_losses)
@@ -97,4 +105,4 @@ if __name__ == "__main__":
     evaluate_and_print_metrics(model, test_dataset)
 
     # 모델 저장
-    save_model(model, "model.pth")
+    save_model(model, _train_conf["model_path"])
